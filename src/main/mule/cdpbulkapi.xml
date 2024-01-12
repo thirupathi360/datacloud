@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:sdc="http://www.mulesoft.org/schema/mule/sdc"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:snowflake="http://www.mulesoft.org/schema/mule/snowflake" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/snowflake http://www.mulesoft.org/schema/mule/snowflake/current/mule-snowflake.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/sdc http://www.mulesoft.org/schema/mule/sdc/current/mule-sdc.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="3d53d355-1928-44ea-b51d-6e1b05a9ace8" >
+		<http:listener-connection host="0.0.0.0" port="8081"/>
+	</http:listener-config>
+	<snowflake:snowflake-config name="Snowflake_Config" doc:name="Snowflake Config" doc:id="418bd29b-8736-4c9a-901a-eccdae9b6ecc" >
+		<snowflake:snowflake-connection accountName="tltjejz-qb45513" warehouse="COMPUTE_WH" database="MULESOFT" schema="TEST" user="Thirupathi360" password="Tirupati@360" role="ACCOUNTADMIN" />
+	</snowflake:snowflake-config>
+	<sdc:sdc-config name="Salesforce_CDP_Sdc_config" doc:name="Salesforce CDP Sdc config" doc:id="2f2d6255-1d03-425d-9caa-d71b6c24b557" >
+		<sdc:oauth-user-pass-connection clientId="3MVG9HB6vm3GZZR8J2TiGKNB7uIM_vl2X6PkpRl9jDpDJMOKPv8FcAQdzKIMZWQ52Scm1gMPfWD3id90kP6C." clientSecret="04105F4942C193B1A8F4F42A8226B05D5C47D1F484AD0715F7708AC9173ECD52" username="thirupathi.masula@cloudodyssey.co" password="Thirupathi@360lQUoKUwj7PFPTwvLyLrndRHz0" audienceUrl="https://login.salesforce.com" />
+	</sdc:sdc-config>
+	<file:config name="File_Config" doc:name="File Config" doc:id="68ae688e-1fe5-45fd-b811-dc0973a49dc8" >
+		<file:connection workingDir="D:\CDP Integration\file_directory" />
+	</file:config>
+	<configuration-properties doc:name="Configuration properties" doc:id="54b2f8ec-7898-40d9-b97e-b47f99523594" file="api\local.yaml" />
+	<flow name="cdpbulkapiFlow" doc:id="8a057fac-bce5-462c-91ea-ccd058c763c9" >
+		<http:listener doc:name="/demo" doc:id="bf541617-2cf5-469f-a983-c3f0a1771772" config-ref="HTTP_Listener_config" path="/insertingDataIntoCDP"/>
+		<logger level="INFO" doc:name="get flow started" doc:id="4a0c4981-4bd6-4b51-8eaf-7802d82ef39a" message="get flow started" />
+		<snowflake:select doc:id="ebfbfb09-69b8-4f57-88ec-0883a03c77a2" config-ref="Snowflake_Config" doc:name="Retriving data " >
+			<snowflake:sql ><![CDATA[select   * from SNOWFLAKEDATA 
+]]></snowflake:sql>
+		</snowflake:select>
+		<logger level="INFO" doc:name="Checking snowflake data" doc:id="e5c630e2-7624-41ef-ad2e-f0aa05d459a2" message="#[sizeOf(payload)]" />
+		<flow-ref doc:name="cdpbulkapiSub_Flow" doc:id="546a3ede-eca3-4e30-b461-bb6bb091757e" name="cdpbulkapiFlow3"/>
+	</flow>
+	<flow name="cdpbulkapiFlow3" doc:id="84f350aa-4ed5-4701-9662-3553a7d76e6b">
+		<logger level="INFO" doc:name="batch-job flow has STARTED" doc:id="c91c9933-22b7-4c54-adda-34caa35b899c" message="batch-job flow has STARTED" />
+		<batch:job jobName="cdpbulkapiBatch_Job" doc:id="3cd73fd4-b698-42e9-8337-f9bfd062507f" blockSize="100000">
+			<batch:process-records>
+				<batch:step name="Batch_Step" doc:id="c810f7b7-4e55-48ef-a3ea-1b626334d56d">
+					<batch:aggregator doc:name="Batch Aggregator" doc:id="e2ade09d-14ef-4293-b6f2-a023229cd015" size="50000">
+						<ee:transform doc:name="mapping" doc:id="3968e02c-0089-418e-aa10-5608eabe93d2">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload map ( payload01 , indexOfPayload01 ) -> {
+	REGION: payload01.REGION default "",
+	COUNTRY: payload01.COUNTRY default "",
+	ITEM_TYPE: payload01.ITEM_TYPE default "",
+	SALES_CHANNEL: payload01.SALES_CHANNEL default "",
+	ORDER_PRIORITY: payload01.ORDER_PRIORITY default "",
+	ORDER_DATE: payload01.ORDER_DATE default "",
+	ORDER_ID: payload01.ORDER_ID default "",
+	SHIP_DATE: payload01.SHIP_DATE default "",
+	UNITS_SOLD: payload01.UNITS_SOLD default "",
+	UNIT_PRICE: payload01.UNIT_PRICE default "",
+	UNIT_COST: payload01.UNIT_COST default "",
+	TOTAL_REVENUE: payload01.TOTAL_REVENUE default "",
+	TOTAL_COST: payload01.TOTAL_COST default "",
+	TOTAL_PROFIT: payload01.TOTAL_PROFIT default ""
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+						<logger level="INFO" doc:name="checking payload" doc:id="57837d66-d0b6-4252-88d4-72b99bf8e11f" message="#[sizeOf(payload)]" />
+						<ee:transform doc:name="data" doc:id="e4b16768-1cf7-4139-99ce-8e1aa520aac1">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	data : payload
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+						<sdc:insert-objects doc:name="Streaming - Insert Objects" doc:id="b6939833-b51b-40bd-a113-79ddd9e6fdf7" config-ref="Salesforce_CDP_Sdc_config" sourceNameUriParam="demo" objectNameUriParam="employeesDetails" />
+					</batch:aggregator>
+				</batch:step>
+			</batch:process-records>
+			<batch:on-complete>
+				<logger level="INFO" doc:name="batch-job flow has ENDED" doc:id="76b6a8a7-f8c6-4321-a577-28bf2e1fdbc0" message="batch-job flow has ENDED" />
+			</batch:on-complete>
+		</batch:job>
+		<ee:transform doc:name="Response" doc:id="b6d9613b-8703-4c73-8b95-6f63911fa242">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  message: "Snowflake Data inserted successfully into DataCloud"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<sub-flow name="cdpbulkapiSub_Flow" doc:id="b30d39bf-b2cb-41aa-943e-5afc4920c1f6" >
+		<ee:transform doc:name="mapping" doc:id="2b0d91f9-a034-4c70-8157-c3933d7dbae6">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload map ( payload01 , indexOfPayload01 ) -> {
+	REGION: payload01.REGION default "",
+	COUNTRY: payload01.COUNTRY default "",
+	ITEM_TYPE: payload01.ITEM_TYPE default "",
+	SALES_CHANNEL: payload01.SALES_CHANNEL default "",
+	ORDER_PRIORITY: payload01.ORDER_PRIORITY default "",
+	ORDER_DATE: payload01.ORDER_DATE default "",
+	ORDER_ID: payload01.ORDER_ID default "",
+	SHIP_DATE: payload01.SHIP_DATE default "",
+	UNITS_SOLD: payload01.UNITS_SOLD default "",
+	UNIT_PRICE: payload01.UNIT_PRICE default "",
+	UNIT_COST: payload01.UNIT_COST default "",
+	TOTAL_REVENUE: payload01.TOTAL_REVENUE default "",
+	TOTAL_COST: payload01.TOTAL_COST default "",
+	TOTAL_PROFIT: payload01.TOTAL_PROFIT default ""
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="checking payload" doc:id="b633cede-3139-4788-96a8-097ace1cc971" message="#[sizeOf(payload)]" />
+		<ee:transform doc:name="data" doc:id="cb99c2bb-a855-4a10-9e74-0017f4edc155">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	data : payload
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<sdc:insert-objects doc:name="Streaming - Insert Objects" doc:id="ae19df8d-1806-4acc-9003-1201c94c9dcf" config-ref="Salesforce_CDP_Sdc_config" sourceNameUriParam="demo" objectNameUriParam="employeesDetails"/>
+		<ee:transform doc:name="Response" doc:id="0d8afded-c544-4817-96bb-5de22706f59c">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  message: "Snowflake Data inserted successfully into DataCloud"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="get flow ended" doc:id="8cb231cc-9671-4ed5-907e-f7a379af9124" message="get flow ended"/>
+	</sub-flow>
+<!-- [STUDIO:"cdpbulkapiFlow1"]	<flow name="cdpbulkapiFlow1" doc:id="bd418a09-9821-41d4-a4d7-913d7ef95240" >
+		<http:listener doc:name="Listener" doc:id="02c813f2-9ef1-4df6-93b1-614cf9864cb1" config-ref="HTTP_Listener_config" path="demo1"/>
+		<ee:transform doc:name="Transform Message" doc:id="f1f2fff5-4597-49fe-a88f-d84fb5b9dff4" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+&#45;&#45;-
+{
+	"sql": p('cdp.query')
+	
+}&#93;&#93;></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="5f428a0c-d320-4a97-921d-ab11380b42ad" message="#[payload&#93;"/>
+		<sdc:query doc:name="Query" doc:id="7433104a-da08-41e4-9737-6c59858f49cc" config-ref="Salesforce_CDP_Sdc_config" responseTimeout="1" responseTimeoutUnit="MINUTES" streamingType="ALWAYS">
+		</sdc:query>
+		<logger level="INFO" doc:name="Logger" doc:id="e79c2edb-ed4e-4430-af45-c4dcfc078419" message="#[sizeOf(payload)&#93;"/>
+		<ee:transform doc:name="Transform Message" doc:id="c6d305c4-cc13-4b8d-ab7a-2cdd24fb190b" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/csv
+&#45;&#45;-
+payload.data map ( datum , indexOfDatum ) -> {
+	REGION: datum.REGION__c,
+	COUNTRY: datum.COUNTRY__c,
+	ITEM_TYPE: datum.ITEM_TYPE__c,
+	SALES_CHANNEL: datum.SALES_CHANNEL__c,
+	ORDER_PRIORITY: datum.ORDER_PRIORITY__c,
+	ORDER_DATE: datum.ORDER_DATE__c,
+	ORDER_ID: datum.ORDER_ID__c,
+	SHIP_DATE: datum.SHIP_DATE__c,
+	UNITS_SOLD: datum.UNITS_SOLD__c,
+	UNIT_PRICE: datum.UNIT_PRICE__c,
+	UNIT_COST: datum.UNIT_COST__c,
+	TOTAL_REVENUE: datum.TOTAL_REVENUE__c,
+	TOTAL_COST: datum.TOTAL_COST__c,
+	TOTAL_PROFIT: datum.TOTAL_PROFIT__c
+}&#93;&#93;></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<file:write doc:name="Write" doc:id="f8fb8513-a44e-4d87-8c10-8b875fd1bcb4" config-ref="File_Config" path="D:\CDP Integration\file_directory\snowflake_directory3.csv"/>
+	</flow> [STUDIO] -->
+	<flow name="updatingFlow" doc:id="9154f65b-0922-4fd8-aa8e-d754db8128cd" >
+		<http:listener doc:name="/update" doc:id="297575f2-5002-40c4-a5f2-68874155f835" config-ref="HTTP_Listener_config" path="/update" />
+		<snowflake:update doc:name="Update" doc:id="98d80405-b1e5-4b51-8744-6f886f5f5e35" config-ref="Snowflake_Config" >
+			<snowflake:sql ><![CDATA[#[payload.sql]]]></snowflake:sql>
+		</snowflake:update>
+		<ee:transform doc:name="Transform Message" doc:id="b997065c-7fc7-4d43-8f4e-f83840eeab91" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/jSON
+---
+{
+	"MESSAGE": "SUCCESSFULLY UPDATED"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="cdpbulkapiFlow2" doc:id="befce2c7-b812-48fd-a0ab-173a18ce9572" >
+		<http:listener doc:name="/insertingDataintoSnowflake" doc:id="f625eaa5-06e7-4ada-8241-cece5ddf52b9" config-ref="HTTP_Listener_config" path="/insertingDataintoSnowflake"/>
+		<ee:transform doc:name="Transform Message" doc:id="7cbf1969-6395-49fb-8bce-fb45429d84a1" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	REGION: payload.REGION,
+	COUNTRY: payload.COUNTRY,
+	ITEM_TYPE: payload.ITEM_TYPE,
+	SALES_CHANNEL: payload.SALES_CHANNEL,
+	ORDER_PRIORITY: payload.ORDER_PRIORITY,
+	ORDER_DATE: payload.ORDER_DATE,
+	ORDER_ID: payload.ORDER_ID,
+	SHIP_DATE: payload.SHIP_DATE,
+	UNITS_SOLD: payload.UNITS_SOLD,
+	UNIT_PRICE: payload.UNIT_PRICE,
+	UNIT_COST: payload.UNIT_COST,
+	TOTAL_REVENUE: payload.TOTAL_REVENUE,
+	TOTAL_COST: payload.TOTAL_COST,
+	TOTAL_PROFIT: payload.TOTAL_PROFIT
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<snowflake:insert doc:name="Insert" doc:id="df2d396f-07e3-4424-a5c1-281a56e5f44b" config-ref="Snowflake_Config">
+			<snowflake:sql ><![CDATA[insert into DATA(REGION, COUNTRY, ITEM_TYPE ,SALES_CHANNEL ,ORDER_PRIORITY , ORDER_DATE ,ORDER_ID ,SHIP_DATE ,UNITS_SOLD ,UNIT_PRICE ,UNIT_COST ,TOTAL_REVENUE ,TOTAL_COST ,TOTAL_PROFIT ) 
+values(:REGION, :COUNTRY, :ITEM_TYPE ,:SALES_CHANNEL ,:ORDER_PRIORITY , :ORDER_DATE ,:ORDER_ID ,:SHIP_DATE ,:UNITS_SOLD ,:UNIT_PRICE ,:UNIT_COST ,:TOTAL_REVENUE ,:TOTAL_COST ,:TOTAL_PROFIT 
+)
+]]></snowflake:sql>
+			<snowflake:input-parameters ><![CDATA[#[{
+		REGION : payload.REGION,
+	COUNTRY : payload.COUNTRY,
+	ITEM_TYPE : payload.ITEM_TYPE,
+	SALES_CHANNEL : payload.SALES_CHANNEL,
+	ORDER_PRIORITY : payload.ORDER_PRIORITY,
+	ORDER_DATE : payload.ORDER_DATE,
+	ORDER_ID : payload.ORDER_ID,
+	SHIP_DATE : payload.SHIP_DATE,
+	UNITS_SOLD : payload.UNITS_SOLD,
+	UNIT_PRICE : payload.UNIT_PRICE,
+	UNIT_COST : payload.UNIT_COST ,
+	TOTAL_REVENUE : payload.TOTAL_REVENUE ,
+	TOTAL_COST : payload.TOTAL_COST ,
+	TOTAL_PROFIT : payload.TOTAL_PROFIT
+}]]]></snowflake:input-parameters>
+		</snowflake:insert>
+		<ee:transform doc:name="Transform Message" doc:id="cfb7d522-f446-43e3-a404-93737f5d402c" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "inserted"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="retrievingdatafromcdp" doc:id="d938b8f2-6564-40e9-8e08-3eb480d68609" >
+		<http:listener doc:name="retrievingdatafromcdp" doc:id="e464b121-1ef6-4f99-a9ee-6d83887ed0ba" config-ref="HTTP_Listener_config" path="/retrievingdatafromcdp"/>
+		<ee:transform doc:name="Transform Message" doc:id="5e920211-6d77-49f6-990c-a00fc116f139" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="4f449531-3a5a-4756-91c3-283e99e5bfb9" message="#[payload]"/>
+		<sdc:query doc:name="Query" doc:id="dc0b7153-e1f7-4a8f-93a0-44da81b2d45b" config-ref="Salesforce_CDP_Sdc_config">
+		</sdc:query>
+		<ee:transform doc:name="Transform Message1" doc:id="6e56c13d-5301-486c-ab06-fb72b42f6477" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.data map ( datum , indexOfDatum ) -> {
+	REGION: datum.REGION__c,
+	COUNTRY: datum.COUNTRY__c,
+	ITEM_TYPE: datum.ITEM_TYPE__c,
+	SALES_CHANNEL: datum.SALES_CHANNEL__c,
+	ORDER_PRIORITY: datum.ORDER_PRIORITY__c,
+	ORDER_DATE: datum.ORDER_DATE__c,
+	ORDER_ID: datum.ORDER_ID__c,
+	SHIP_DATE: datum.SHIP_DATE__c,
+	UNITS_SOLD: datum.UNITS_SOLD__c,
+	UNIT_PRICE: datum.UNIT_PRICE__c,
+	UNIT_COST: datum.UNIT_COST__c,
+	TOTAL_REVENUE: datum.TOTAL_REVENUE__c,
+	TOTAL_COST: datum.TOTAL_COST__c,
+	TOTAL_PROFIT: datum.TOTAL_PROFIT__c
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	
+</mule>

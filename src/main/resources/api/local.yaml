@@ -1,0 +1,7 @@
+cdp:
+  query: "select * from snowflakeBulkAPI_employeesDetai_D0A1EAEF__dll limit 100000"
+  retrievingdatafromcdp : "select * from snowflakeBulkAPI_employeesDetai_D0A1EAEF__dll where ORDER_ID = '100009763' "
+  
+  
+snowflake:
+  update: "update SNOWFLAKEDATA set ORDER_PRIORITY ='k' , REGION='EUROPE' WHERE ORDER_ID= '100009763' ;"
