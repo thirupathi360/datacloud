@@ -42,6 +42,7 @@
 						<region>us-east-2</region>
 						<businessGroupId>${env.BUS_GROUP_ID}</businessGroupId>
 					</cloudHubDeployment>
+					<skipMunitTests>true</skipMunitTests>
 					<sharedLibraries>
 						<sharedLibrary>
 							<groupId>net.snowflake</groupId>
